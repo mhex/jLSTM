@@ -1,0 +1,47 @@
+<!--
+
+ $Id: build.xml 97 2008-10-07 06:56:30Z mhe $
+
+-->
+
+<project name="jLSTMSCOPIW" default="jar" basedir=".">
+
+	<path id="build.path">
+	      <!-- pathelement location="lib/biojava.jar"/>
+	      <pathelement location="lib/bytecode.jar"/ -->
+		<!-- pathelement path="lib/"/ -->
+		<fileset dir="lib">
+		            <include name="**/*.jar"/>
+		          </fileset>
+	</path>
+
+	<target name="compile">
+		<javac srcdir="src"
+			destdir="bin"
+		    debug="off"
+		    deprecation="on"
+		    classpathref="build.path"
+	        includeantruntime="false"
+		    optimize="on"
+		/>
+
+
+	</target>
+
+	<target name="jar" depends="compile">
+		<jar destfile="jlstmscop.jar"
+	       basedir="bin"
+		/>
+	</target>
+
+	<target name="run" depends="jar">
+		<java classname="at.jku.bioinf.jlstm.JLSTMSCOP"
+	      classpathref="build.path"
+          classpath="jlstmscop.jar"
+	      fork="true">
+          <arg line="-p JLSTMSCOP.properties -w wm.mat -t 4"/>
+		</java>
+	</target>
+
+
+</project>
