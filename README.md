@@ -6,8 +6,10 @@ in https://academic.oup.com/bioinformatics/article/23/14/1728/189356/Fast-model-
 Each thread randomly picks a sequence, copies the global weight matrix in its thread space and does
 forward- and backpropagation. Therefore, forward- and backpropagation only rely on the local weight matrix.
 After a write lock on the global matrix the deltas are applied and the write lock is released. This is repeated for
-every thread until a stopping criterion is reached. Occasional forward propagations of some held out test sequences
-done by some thread reaching a global step number report the generalization error parallel to the training procedure.
+every thread in parallel until a stopping criterion is reached. Every thread maintains its own shuffeled sequence list.
+Once the sequence list is trained by a thread a global epoch counter is incremented secured by a write lock.
+After a given number of epochs the first thread reaching this number is doing a forward propagation on some held out test sequences by grabbing the current weight matrix. The other threads continue training. Training and test metrics are accuracy,
+number of false and true positives and negatives as well the AUC of the ROC and ROC50.
 
 see also
 
