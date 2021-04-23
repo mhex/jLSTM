@@ -142,42 +142,27 @@ public class LSTMThread extends Thread {
             int numThreads, int threadNr) {
 
     	this.windowSize = windowSize;
-
     	this.numGaussians = numGaussians;
-
     	this.writeweightsafternepochs = writeweightsafternepochs;
-
     	this.testnepochs = testnepochs;
-
     	this.test = test;
 
         //int numSeqsTrain   = (seqsTrain != null) ? seqsTrain.size() : 0;
         int numSeqsTest    = seqsTest.size();
-
     	int numSeqsTrain = batchSize;
 
         if (!test) {
-
         	this.seqsTrain  = (ArrayList<LSTMSequence>)seqsTrain.clone();
-
         }
 
         this.seqsTest       = (ArrayList<LSTMSequence>)seqsTest.clone();
-
         this.wm             = wm;
-
         this.batchSize      = batchSize;
-
         this.upperAlpha     = upperAlpha;
-
         this.dwCut          = dwCut;
-
         this.internalEpoch  = 1;
-
         this.maxepochs      = maxepochs;
-
         this.numThreads     = numThreads;
-
         this.threadNr       = threadNr;
 
         // Create QP Solver
@@ -197,31 +182,22 @@ public class LSTMThread extends Thread {
 
         // Make LSTM network
         if (test) {
-
         	lstm = new LSTM(numUnits, lastInputUnit, biasUnit, lastLSTMUnit, numInputsLocalCoding,
                      numBlocks, blockSize, numSymbols, alpha, dropoutRate,
                      numGaussians, numPositionBins,
                      0, numSeqsTest,
                      rocn,
                      wm, threadNr);
-
         }
-
         else {
-
         	lstm = new LSTM(numUnits, lastInputUnit, biasUnit, lastLSTMUnit, numInputsLocalCoding,
         			numBlocks, blockSize, numSymbols, alpha, dropoutRate,
         			numGaussians, numPositionBins,
         			batchSize, numSeqsTest,
         			rocn,
         			wm, threadNr);
-
         	lstm.init(biasInputGate, biasOutputGate,biasMemUnit, weightToOutput, outputBias);
-
         }
-
-
-
     }
 
 	/**
@@ -234,28 +210,20 @@ public class LSTMThread extends Thread {
 		// For all training sequences
 	    //int numSeqsTrain = seqsTrain.size();
         for (int seqNr = 0; seqNr < batchSize; seqNr++) {
-
         	LSTMSequence seq = seqsTrain.get(seqNr);
-
         	// Skip this sequence flagged without error
         	if (!trainAll) {
         		if (!seq.getToTrain()) {
-        			//System.out.println("Thread " + threadNr + " " + seq.getToTrain() + " skip " + i + " " + internalEpoch);
-        			continue;
+        		    continue;
         		}
         	}
-
-            // Create input matrix
         	// Create input matrix
             im.computeInputs(seq, windowSize, numSymbols, numGaussians);
-
             // Set  input index and input vector in the lstm core
             lstm.setInputIndex(im.getInputIndex());
             lstm.setInputVector(im.getInputVector());
-
             // Set label
             lstm.setTargets(seq.getTargets());
-
             // For all elements in the current sequence i except the last one
             int j;
             for (j = 0; j < seq.getLocalCodings().length - 1; j++) {
@@ -264,7 +232,6 @@ public class LSTMThread extends Thread {
                 lstm.derivatives(j);
                 lstm.timeforward();
             }
-
             // The last element has a target
             lstm.cloneWeightMatrix();
             lstm.shuffleDropoutMask();
@@ -273,38 +240,21 @@ public class LSTMThread extends Thread {
             //System.out.println("Thread " + threadNr + " " + isError + " " + i + " " + internalEpoch);
             //seq.setToTrain(isError);
             lstm.backwardPass(j);
-
             /* For QP solver */
             lstm.fillDWMatrix(seqNr);
-
-            //if (epoch % 3 != 0) {
-
-                /* write lock the weight update */
-            //    wlock.lock();
-            //    wm.weightUpdate(lstm.getDW());
-            //    wlock.unlock();
-
-            //}
-
             lstm.compCrossEntropyError(seqNr, true);
-
             lstm.compRanks(seqNr, true);
-
             lstm.reset();
-
         }
 
         lstm.printError(epoch, seqsTrain, true);
 
         /* Calculate dw kernel */
         Matrix dwK = qps.calcDWKernelGPU(lstm.getDwMatrix(), threadNr);
-
         //Matrix dwK = qps.calcDWKernelCPU(lstm.getDwMatrix(), threadNr);
 
-        //System.exit(1);
-
-        float min = +10000000;
-        float max = -10000000;
+        float min = Integer.MAX_VALUE;
+        float max = Integer.MIN_VALUE;
 
         float sumCEE = 0;
 
@@ -315,31 +265,25 @@ public class LSTMThread extends Thread {
             sumCEE += crossEntropyError;
             float crossEntropyErrorLim = (crossEntropyError > 4.0) ? 4.0f : crossEntropyError;
             deltaLoss[i] = p[i] * crossEntropyErrorLim;
-            //deltaLoss[i] = p[i];
         }
 
         System.out.format("Thread %d Crossentropy Error: min: %.6f max: %.6f mean %.6f", threadNr, min, max, sumCEE/deltaLoss.length);
         System.out.println();
-
 
         /* Solve qp */
         float[] alphas = qps.solveJO(dwK, deltaLoss, 0, upperAlpha, threadNr);
         //float[] alphas = smo.solve(lstm.getDwMatrix(), deltaLoss, 0, upperAlpha, threadNr);
         //float[] alphas = new float[batchSize];
 
-        //Arrays.fill(alphas, 0.001f);
-
-        min = +10000000;
-        max = -10000000;
+        min = Integer.MAX_VALUE;
+        max = Integer.MIN_VALUE;
 
         float sumAlphas = 0;
 
-        for (int i = 0; i < alphas.length; i++) {
-	    //alphas[i] *= 1.0 / ( 1 + epoch / 50.0f );
-            min = (alphas[i] < min) ? alphas[i] : min;
-            max = (alphas[i] > max) ? alphas[i] : max;
-            sumAlphas += alphas[i];
-
+        for (float alpha : alphas) {
+            min = Math.min(alpha, min);
+            max = Math.max(alpha, max);
+            sumAlphas += alpha;
         }
 
         System.out.format("Thread %d alphas: min: %.6f max: %.6f mean %.6f", threadNr, min, max, sumAlphas/alphas.length);
@@ -360,7 +304,6 @@ public class LSTMThread extends Thread {
 
         System.out.println();
 
-
 	}
 
 	/**
@@ -378,45 +321,34 @@ public class LSTMThread extends Thread {
     	for (int i = 0; i < seqsTest.size(); i++) {
 
     		LSTMSequence seq = seqsTest.get(i);
-
     		im.computeInputs(seq, windowSize, numSymbols, numGaussians);
-
     		lstm.setInputIndex(im.getInputIndex());
             lstm.setInputVector(im.getInputVector());
-
-
     		lstm.setTargets(seqsTest.get(i).getTargets());
-
     		lstm.cloneWeightMatrix();
-
     		lstm.reset();
-
     		int j;
-
     		for (j = 0; j < seqsTest.get(i).getLocalCodings().length - 1; j++) {
     			lstm.forwardPass(j, false, false);
     			lstm.timeforward();
     		}
-
     		lstm.forwardPass(j, true, false);
     		lstm.compError();
     		lstm.compCrossEntropyError(i, false);
     		lstm.compRanks(i, false);
     		lstm.reset();
-
     	}
 
     	lstm.printError(epoch, seqsTest, false);
 
-    	float min = +10000000;
-        float max = -10000000;
-
+    	float min = Integer.MAX_VALUE;
+        float max = Integer.MIN_VALUE;
         float sumCEE = 0;
 
         for (int i = 0; i < seqsTest.size(); i++) {
             float crossEntropyError = lstm.getCrossEntropyErrorsTest()[i];
-            min = (crossEntropyError < min) ? crossEntropyError : min;
-            max = (crossEntropyError > max) ? crossEntropyError : max;
+            min = Math.min(crossEntropyError, min);
+            max = Math.max(crossEntropyError, max);
             sumCEE += crossEntropyError;
         }
 
@@ -427,7 +359,6 @@ public class LSTMThread extends Thread {
     	lstm.setEpoch_err(0);
     	lstm.setFalsepos(0);
     	lstm.setFalseneg(0);
-
 
 	}
 
@@ -440,69 +371,38 @@ public class LSTMThread extends Thread {
 		int myEpoch;
 
 		if (test) {
-
 			test(epoch);
 			return;
 		}
 
 		Random r = new Random();
-
 		Lock lock = new ReentrantLock();
-
 		while (epoch <= maxepochs - 1) {
-
 			lock.lock();
-
             epoch++;
             myEpoch = epoch;
-
             lock.unlock();
-
             // Shuffle data set
             Collections.shuffle(seqsTrain, r);
-
             // Train all flag
             boolean trainAll = true;
-
-            /*
-            if ((myEpoch - 1) % numThreads == 0  & internalEpoch > 1) {
-
-            	System.out.println("Thread " + threadNr + " trainAll " + myEpoch);
-            	System.out.println();
-
-            	trainAll = true;
-
-            }
-            */
-
             // Training
             training(myEpoch, trainAll);
-
             // Write weight matrix
             if ((myEpoch % writeweightsafternepochs == 0 && myEpoch > 0) || myEpoch == maxepochs) {
-
             	System.out.println("Thread: " + threadNr);
             	System.out.println("write weightmatrix");
             	System.out.println();
-
                 wm.writeWeightMatrix();
-
                 if (humanreadableweightmatrix != 0) {
                     wm.writeReadableWeightMatrix();
                 }
-
             }
-
             // Test after n epochs
             if ((myEpoch % testnepochs == 0 && myEpoch > 0) || myEpoch == maxepochs) {
             	test(myEpoch);
             }
-
             internalEpoch++;
-
         }
-
 	}
-
-
 }

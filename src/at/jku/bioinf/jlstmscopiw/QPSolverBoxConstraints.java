@@ -21,37 +21,23 @@ import jcuda.runtime.JCuda;
 public class QPSolverBoxConstraints {
 	
 	float[] dwMatrix;
-	
 	float[][] dwMatrixA;
-	
 	Matrix dwMatrixM;
-	
 	float[] kernelVector;
-	
 	Matrix dwK;
-	 
 	Matrix uvecTemplate, lvecTemplate, pTemplate;
-	
 	int numExamples;
-	
 	int gpu;
-	
 	double[][] I, Ineg;
 	
 	public QPSolverBoxConstraints(int numExamples, int dimdWTo, int dimdWFrom, float l, float u, int gpu) {
-	    
+
 	    dwMatrix = new float[numExamples * dimdWTo * dimdWFrom];
-	    
 	    //dwMatrixM = new Matrix(numExamples, dimdWTo * dimdWFrom);
-	    
 	    kernelVector = new float[numExamples * numExamples];
-	    
 	    dwK = new Matrix(numExamples, numExamples);
-		
 		uvecTemplate = new Matrix(numExamples, 1, u);
-		
 		lvecTemplate = new Matrix(numExamples, 1, l);
-		
 		pTemplate    = new Matrix(numExamples, 1, 0);
 		
         // Identity matrix
@@ -63,7 +49,6 @@ public class QPSolverBoxConstraints {
         for(int i = 0; i < numExamples; i++) Ineg[i][i] = -1.0;
 		
 		this.numExamples = numExamples;
-		
 		this.gpu     = gpu;
 		
 	}
@@ -71,22 +56,16 @@ public class QPSolverBoxConstraints {
 	public float[] solveJO(Matrix Q, float[] cFloat, float l, float u, int threadNr) {
 
 	    double[] uvec = uvecTemplate.copy().getColumnPackedCopy();
-        
         double[] lvec = lvecTemplate.copy().getColumnPackedCopy();
-        
         // Cast to double
         double[] c = new double[cFloat.length];
-       
         for (int i = 0 ; i < cFloat.length; i++) {
             c[i] = -cFloat[i];
             //uvec[i] = -uvec[i];
         }
-	    
 	    // Objective function
         PDQuadraticMultivariateRealFunction objectiveFunction = new PDQuadraticMultivariateRealFunction(Q.getArray(), c, 0);
 
-        
-        
         //inequalities
         ConvexMultivariateRealFunction[] inequalities = new ConvexMultivariateRealFunction[2 * numExamples];
         for (int i = 0; i < numExamples; i++) {
@@ -95,8 +74,7 @@ public class QPSolverBoxConstraints {
         for (int i = 0; i < numExamples; i++) {
             inequalities[numExamples + i] = new LinearMultivariateRealFunction(I[i], -uvec[i]);
         }
-        
-        
+
         /* Doesn't work
         ConvexMultivariateRealFunction[] inequalities = new ConvexMultivariateRealFunction[2];
         inequalities[0] = new PDQuadraticMultivariateRealFunction(Ineg, lvec, 0);
@@ -106,17 +84,13 @@ public class QPSolverBoxConstraints {
         //optimization problem
         OptimizationRequest or = new OptimizationRequest();
         or.setF0(objectiveFunction);
-        
         //or.setInitialPoint(new double[] { 0.1, 0.9});
         or.setFi(inequalities);
-        
         or.setToleranceFeas(1.E-5);
         or.setTolerance(1.E-5);
-        
         //optimizer
         JOptimizer opt = new JOptimizer();
         opt.setOptimizationRequest(or);
-        
         //optimization
         try {
             int returnCode = opt.optimize();
@@ -126,16 +100,13 @@ public class QPSolverBoxConstraints {
             System.exit(-1);
         }
 	    
-      //get results
+        //get results
         double[] sol = opt.getOptimizationResponse().getSolution();
-        
         float[] solFloat = new float[numExamples];
         for (int i = 0 ; i < numExamples; i++) {
             solFloat[i] = (float) sol[i];
         }
-
-        return(solFloat); 
-	    
+        return(solFloat);
 	}
 	
 		
@@ -147,200 +118,109 @@ public class QPSolverBoxConstraints {
 	   
 	    // Cast to double
 	    double[] c = new double[cFloat.length];
-	   
 	    for (int i = 0 ; i < cFloat.length; i++) {
 	        c[i] = cFloat[i];
 	    }
-        
 	    Matrix uvec = uvecTemplate.copy();
-	    
 	    Matrix lvec = lvecTemplate.copy();
-	    
 	    Matrix p = pTemplate.copy();
-	        
 	    Matrix x = uvec.plus(lvec).times(0.5);
-	    
 	    Matrix Hx = H.times(x);
-	    
 	    Matrix xHx = x.transpose().times(Hx);
-	    
 	    Matrix cM = new Matrix(c, numExamples);
-	    
 	    Matrix cx = cM.transpose().times(x);
-	    
 	    Matrix Qx = xHx.times(0.5).plus(cx);
-	    
 	    Matrix g = Hx.plus(cM);
-	    
 	    Matrix QxOld = Qx.copy();
-	    
 	    boolean[] AOld = logicalOr(x, l, u);
-	        
 	    Matrix gR = g.copy();
-	    
+
 	    for (int i = 0; i < gR.getRowDimension(); i++) {
-            
             if (AOld[i]) gR.set(i, 0, 0);
-            
         }
 	    
 	    Matrix gP = g.copy();      
 	            
 	    double sigma = 0.1;
 	    double gamma = 0.9;
-	    
 	    double eta = g.norm2();
-	    
 	    double gR2 = gR.norm2();
-	    
 	    double gR2Old = gR2;
 	    
 	    Matrix xold = x.plus(new Matrix(numExamples, 1, 0.01));
-	    
 	    Matrix xnew;
 	    
 	    boolean[] A, B;
-	    
-	    double gp, alpha, beta;   
-	    
-	    //System.out.println("xoldmx: " + xold.minus(x).norm2());
-	        
+	    double gp, alpha, beta;
 	    int cycleCounter = 0;
-	    
 	    int maxCycles = 10000;
 	    
 	    while (true) {
-
-	        //System.out.format("gR2: %.4f epsilon: %d %s", gR2, epsilonCounter, !logicalAllMatrix(x, xold));
-	        //System.out.println();
-	        
 	        if (cycleCounter++ > maxCycles) {
 	            System.out.format("Thread %d QP solver break: cylce counter > %d gR2: %.4f", threadNr, maxCycles, gR2);
 	            System.out.println();
 	            break;
 	        }
-	        
 	        if (gR2 < 0.01 || logicalAllMatrix(x, xold)) {
 	            System.out.format("Thread %d QP solver break: gR2 %.4f x=xold: %s cycleCounter: %d", threadNr, gR2, logicalAllMatrix(x, xold), cycleCounter);
 	            System.out.println();
 	            break;
 	        }
-
 	        A = logicalOr(x, l, u);
-
 	        B = logicalOrElementwise(logicalAnd(x, l, g, true), logicalAnd(x, u, g, false));
-
 	        gR = g.copy();
-
 	        for (int i = 0; i < gR.getRowDimension(); i++) {
-
 	            if (A[i]) gR.set(i, 0, 0);
-
 	        }
-
 	        gP = g.copy();
-
 	        for (int i = 0; i < gP.getRowDimension(); i++) {
-
 	            if (B[i]) gP.set(i, 0, 0);
-
 	        }
-
 	        gR2 = gR.norm2();
-
 	        if (Math.sqrt(gR2) <= eta) {
-
 	            if (logicalAll(AOld, B)) {
-
 	                beta = gR2 / gR2Old;
-
 	            } else {
-
 	                beta = 0;
-
 	            }
-
 	            p = gP.plus(p.times(beta)).times(-1);
-
 	        } else {
-
 	            if (logicalAll(AOld,A)) {
-
 	                beta = gR2 / gR2Old;
-
 	            } else {
-
 	                beta = 0;
-
 	            }
-
 	            p = gR.plus(p.times(beta)).times(-1);;
-
 	        }
-
 	        if (logicalAllMatScalar(p, 0)) {
-	            
 	            System.out.println("Thread " + threadNr + " QP solver break: all ps = 0 cyclecounter: " + cycleCounter);
-
 	            break;
-
 	        }
 
 	        gp = g.transpose().times(p).get(0,0);
-
 	        alpha = - gp / p.transpose().times(H).times(p).get(0, 0);
-
 	        while (true) {
-
 	            xnew = x.plus(p.times(alpha));
-
 	            xnew = minElementwise(uvec.getRowPackedCopy(),
 	                    maxElementwise(lvec.getRowPackedCopy(),
 	                            xnew.getRowPackedCopy()));
-
 	            Hx = H.times(xnew);
-
 	            xHx = xnew.transpose().times(Hx);
-
 	            cx = cM.transpose().times(xnew);
-
 	            Qx = xHx.times(0.5).plus(cx);
 
-	            //System.out.println("diff:", Qx - QxOld);
-
-	            //if (alpha < 0.01) alpha = 0;
-
 	            if (Qx.minus(QxOld).get(0, 0) <= gamma * alpha * gp) {
-
-	                //System.out.format("Qx: %.5f gamma: %.5f alpha: %.5f gp %.5f gagp: %.5f",
-	                //        Qx.minus(QxOld).get(0, 0), gamma, alpha, gp, gamma * alpha * gp);
-	                //System.out.println();
 	                break;
-
 	            }
-
 	            alpha *= sigma;
-
 	        }
-
 	        xold = x.copy();
-
 	        x = xnew.copy();
-
 	        g = Hx.plus(cM);
-
 	        gR2Old = gR2;
-
 	        QxOld = Qx.copy();
-
-	        for (int i = 0; i < A.length; i++) {
-	            
-	            AOld[i] = A[i];
-	            
-	        }
-
+            System.arraycopy(A, 0, AOld, 0, A.length);
 	        eta *= 0.5;
-
 	    }
 
 	    float[] xFloat = new float[numExamples];
@@ -355,35 +235,24 @@ public class QPSolverBoxConstraints {
     Matrix calcDWKernelGPU(float[][][] dwMatrices, int threadNr) {
         
         int numExamples = dwMatrices.length;
-        
         int dimdWTo = dwMatrices[0].length;
         int dimdWFrom = dwMatrices[0][0].length;
-        
         int dwVectorLength = dimdWTo * dimdWFrom;
-        
         int dwMatSize = numExamples * dwVectorLength;
-        
         int kMatSize = numExamples * numExamples;
         
         System.out.println("Thread " + threadNr + " Kernel GPU: " + numExamples + " " + dimdWTo + " " + dimdWFrom);
         System.out.println("Thread " + threadNr + " flatten matrix..");
         
         int index = 0;
-        
-        for (int i = 0; i < numExamples; i++) {
-        
+
+        for (float[][] matrix : dwMatrices) {
             for (int j = 0; j < dimdWTo; j++) {
-                
                 for (int k = 0; k < dimdWFrom; k++) {
-          
-                    dwMatrix[index] = dwMatrices[i][j][k];
-                    
+                    dwMatrix[index] = matrix[j][k];
                     index++;
-        
                 }
-        
             }
-            
         }
         
         // Initialize JCublas
@@ -450,7 +319,6 @@ public class QPSolverBoxConstraints {
         System.out.println("GPU " + gpu + " CUDA sgemm..");
 
         float alpha = 1;
-
         float beta = 0;
 
         // Execute sgemm
@@ -467,7 +335,6 @@ public class QPSolverBoxConstraints {
             System.out.println("Cublas get vector error: " + error + " " + JCuda.cudaGetErrorString(error));
             JCublas.cublasFree(dwMP);
             JCublas.cublasFree(dwKernelP);
-
             JCublas.cublasShutdown();
             System.exit(error);
         }
@@ -481,35 +348,22 @@ public class QPSolverBoxConstraints {
         JCublas.cublasShutdown();
         
         System.out.println("Thread " + threadNr + " fill mat..");
-        
-        
-        
-        double max = -100000;
-        
-        double min = +100000;
-        
+
+        double max = Integer.MIN_VALUE;
+        double min = Integer.MAX_VALUE;
         double sumK = 0;
-        
         index = 0;
-        
+
         for (int i = 0; i < numExamples; i++) {
-            
             for (int j = 0; j < numExamples; j++) {
-                
                 dwK.set(i,j, kernelVector[index]);
-                
                 max = (kernelVector[index] > max) ? kernelVector[index] : max;
-                
                 min = (kernelVector[index] < min) ? kernelVector[index] : min;
-                
                 sumK += kernelVector[index];
-                
                 index++;
-                
             }
         }
-        
-        
+
         System.out.format("Thread %d GPU Kernel: %d,%d min: %.4f max: %.4f mean %.4f", threadNr, dwK.getRowDimension(), dwK.getColumnDimension(), min, max, sumK / kMatSize);
         System.out.println();       
         
@@ -521,60 +375,36 @@ public class QPSolverBoxConstraints {
 	Matrix calcDWKernelCPU(float[][][] dwMatrices, int threadNr) {
 	    
         numExamples = dwMatrices.length;
-        
         int dimDWTo = dwMatrices[0].length;
-        
         int dimDWFrom = dwMatrices[0][0].length;
-        
-        //int dwVectorLength = dimDWTo * dimDWFrom;
-        
-        //int dwMatSize = numExamples * dwVectorLength;
-        
         int kMatSize = numExamples * numExamples; 
         
         System.out.println("Thread " + threadNr + " Kernel CPU: " + numExamples + " " + dimDWTo + " " + dimDWFrom);
         System.out.println("Thread " + threadNr + " flatten matrix..");
         
         for (int i = 0; i < numExamples; i++) {
-            
             int index = 0;
-        
             for (int j = 0; j < dimDWTo; j++) {
-                
                 for (int k = 0; k < dimDWFrom; k++) {
-          
                     dwMatrixM.set(i,index, dwMatrices[i][j][k]);
-                    
                     index++;
-        
                 }
-        
             }
-            
         }       
         
         System.out.println("Thread " + threadNr + " Calculating kernel.. ");
         
-        Matrix dwK = dwMatrixM.times(dwMatrixM.transpose());    
-        
-        double max = -100000;
-        
-        double min = +100000;
-        
+        Matrix dwK = dwMatrixM.times(dwMatrixM.transpose());
+        double max = Integer.MIN_VALUE;
+        double min = Integer.MAX_VALUE;
         float sumK = 0;
         
         for (int i = 0; i < numExamples; i++) {
-        
             for (int j = 0; j < numExamples; j++) {
-                    
                     max = (dwK.get(i,j) > max) ? dwK.get(i,j) : max;
-                    
                     min = (dwK.get(i,j) < min) ? dwK.get(i,j) : min;
-                    
                     sumK += dwK.get(i,j);
-        
             }
-            
         }
         
         System.out.format("Thread %d CPU Kernel: %d,%d min: %.4f max: %.4f mean %.4f", threadNr, numExamples, numExamples, min, max, sumK / kMatSize);
@@ -587,57 +417,35 @@ public class QPSolverBoxConstraints {
 	boolean[] logicalOr(Matrix x, float l, float u) {
 	    
 	    int vLength = x.getRowDimension();
-	    
 	    boolean[] resultVector = new boolean[vLength];
-	    
+
 	    for (int i = 0; i < vLength; i++) {
-	        
 	        if (x.get(i,  0) == l || x.get(i, 0) == u) {
-	            
 	            resultVector[i] = true;
-	        
 	        }
-	        
 	    }
 	    
 	    return resultVector;
 	    
 	}
 	
-	//np.logical_and(x==u, g<=0.0)
-	
     boolean[] logicalAnd(Matrix x, float val, Matrix g, boolean gt) {
         
         int vLength = x.getRowDimension();
-        
         boolean[] resultVector = new boolean[vLength];
         
         if (gt) {
-        
             for (int i = 0; i < vLength; i++) {
-            
                 if (x.get(i,  0) == val && g.get(i, 0) >= 0) {
-                
                     resultVector[i] = true;
-            
                 }
-                
             }
-            
         } else {
-            
             for (int i = 0; i < vLength; i++) {
-                
                 if (x.get(i,  0) == val && g.get(i, 0) <= 0) {
-                
                     resultVector[i] = true;
-            
                 }
-                
             }
-            
-            
-            
         }
         
         return resultVector;
@@ -649,9 +457,7 @@ public class QPSolverBoxConstraints {
         boolean[] resultVector = new boolean[a.length];
         
         for (int i = 0; i < a.length; i++) {
-            
             resultVector[i] = a[i] && b[i];
-            
         }
         
         return(resultVector);
@@ -661,9 +467,7 @@ public class QPSolverBoxConstraints {
     boolean logicalAll(boolean[] a, boolean[] b) {
                 
         for (int i = 0; i < a.length; i++) {
-            
             if (a[i] != b[i]) return(false);
-            
         }
         
         return(true);
@@ -673,13 +477,9 @@ public class QPSolverBoxConstraints {
     boolean logicalAllMatScalar(Matrix a, int val) {
         
         for (int i = 0; i < a.getRowDimension(); i++) {
-            
             for (int j = 0; j < a.getColumnDimension(); j++) {
-            
                 if (a.get(i,j) != val) return(false);
-            
             }
-            
         }
         
         return(true);
@@ -689,13 +489,9 @@ public class QPSolverBoxConstraints {
     boolean logicalAllMatrix(Matrix a, Matrix b) {
         
         for (int i = 0; i < a.getRowDimension(); i++) {
-            
             for (int j = 0; j < a.getColumnDimension(); j++) {
-            
                 if (a.get(i,j) != b.get(i,j)) return(false);
-            
             }
-            
         }
         
         return(true);
@@ -703,13 +499,10 @@ public class QPSolverBoxConstraints {
     }
     
     double[] maxElementwise(double[] a, double[] b) {
-        
-       double[] resultVector = new double[a.length];
-        
+
+	    double[] resultVector = new double[a.length];
         for (int i = 0; i < a.length; i++) {
-            
-            resultVector[i] = (a[i] > b[i]) ? a[i] : b[i];
-            
+            resultVector[i] = Math.max(a[i], b[i]);
         }
         
         return(resultVector);
@@ -719,11 +512,8 @@ public class QPSolverBoxConstraints {
     Matrix minElementwise(double[] a, double[] b) {
         
         double[] resultVector = new double[a.length];
-        
         for (int i = 0; i < a.length; i++) {
-            
             resultVector[i] = (a[i] < b[i]) ? a[i] : b[i];
-            
         }
         
         return(new Matrix(resultVector, a.length));
@@ -742,9 +532,9 @@ public class QPSolverBoxConstraints {
         int n = A[0].length;
         float[] v = new float[m * n];
         int count = 0;
-        for (int i = 0; i < m; i++) {
+        for (float[] floats : A) {
             for (int j = 0; j < n; j++) {
-                v[count] = A[i][j];
+                v[count] = floats[j];
                 count += 1;
             }
         }

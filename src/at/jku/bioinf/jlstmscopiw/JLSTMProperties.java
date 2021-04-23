@@ -46,9 +46,7 @@ import java.util.Properties;
 public class JLSTMProperties {
     
     public static Properties readProperties (String propfile) {
-        
         Properties properties = new Properties();
-        
         try {
             properties.load(new FileInputStream(propfile));
         }
@@ -56,9 +54,7 @@ public class JLSTMProperties {
             System.out.println("Can't load properties file " + propfile);
             System.exit(-1);
         }
-        
         return properties;
-
     }
 
 }

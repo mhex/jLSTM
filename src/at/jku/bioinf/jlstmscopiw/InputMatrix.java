@@ -59,44 +59,31 @@ public class InputMatrix {
         
         /* half of the window */
         int wside = (windowSize - 1) / 2;
-        
         int seqLength = lstmSequence.getLocalCodings().length;
-        
         float[][] positionCodings = lstmSequence.getPositionCodings();
         int[][] positionIndices    = lstmSequence.getPositionIndices();
-        
         /* Input vector (only 1s for local coding) */
         inputVector = new float[seqLength][windowSize + numGaussians];
         /* Index for local coding */
         inputIndex  = new short[seqLength][windowSize + numGaussians];
-        
         int numNAInputs   =  nSymbols * windowSize;
 
         /*
-        
         Order of AAs
-        
         ALA ARG ASN ASP CYS GLN GLU GLY HIS ILE LEU LYS MET PHE PRO SER THR 
         TRP TYR VAL ASX X GLX
-        
         'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F',
         'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'Z', 'X'
-        
         */
         
         /* Values for local coding */
-        
         final float[] aaVal = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
                            1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
                            1.0f, 1.0f, 0.0f };
-
-        
         short[] localCodings = lstmSequence.getLocalCodings();
         
         for (int i = 0; i < seqLength; i++) {
-                 
             int starti = i - wside;
-
             /* amino coding */
             for (int j = 0; j < windowSize; j++) {
                 int iter = starti + j;
@@ -110,23 +97,16 @@ public class InputMatrix {
                     inputIndex[i][j] = (short)(j * nSymbols + aaCharPos);
                 }
             }
-            
             for (int j = 0; j < numGaussians; j++) {
-            	
             	inputVector[i][j + windowSize] = positionCodings[i][j];
             	inputIndex[i][j + windowSize]  = (short)(numNAInputs + positionIndices[i][j]);
-            	
             }
-            
         }
-            
     }
     
     public float[][] getInputVector() {
         return inputVector;
     }
-
-
     public short[][] getInputIndex() {
         return inputIndex;
     }

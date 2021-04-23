@@ -56,204 +56,106 @@ public class SMO {
         System.out.println("Thread " + threadNr + " SMO: W " + numExamples + " " + dimDWTo + " " + dimDWFrom);
         System.out.println("Thread " + threadNr + " SMO: flatten matrix..");
         
-        double min = +10000000;
-        double max = -10000000;
+        double min = Integer.MAX_VALUE;
+        double max = Integer.MIN_VALUE;
     
         double sum = 0;
         
         for (int i = 0; i < numExamples; i++) {
-            
             int index = 0;
-            
             for (int j = 0; j < dimDWTo; j++) {
-                
                 for (int k = 0; k < dimDWFrom; k++) {
-          
                     dwMatrix[i][index] = dwMatrices[i][j][k];
-                    
-                    min = (dwMatrix[i][index] < min) ? dwMatrix[i][index] : min;
-                    
-                    max = (dwMatrix[i][index] > max) ? dwMatrix[i][index] : max;
-                    
+                    min = Math.min(dwMatrix[i][index], min);
+                    max = Math.max(dwMatrix[i][index], max);
                     sum += dwMatrix[i][index];
-                    
                     index++;
-        
                 }
-        
             }
-            
         }       
-        
-    
+
         System.out.format("SMO: Thread %d dwMat: min: %.6f max: %.6f mean %.6f", threadNr, min, max, sum/(numExamples * dimDWTo * dimDWFrom));
         System.out.println();
     
         /* Init variables */
-        
-	    
 	    double[] alphas = new double[numExamples];
-	    
 	    Arrays.fill(alphas,  0);
-	    
 	    double[] alphasOld = new double[numExamples];
-	    
 	    //double[] alphasDiffs = new double[numExamples];
-	    
 	    double[][] K = new double[numExamples][numExamples];
-	    
         double[] uvec = new double[numExamples];
-        
         Arrays.fill(uvec,  u);
-        
         double[] lvec = new double[numExamples];
-        
         Arrays.fill(lvec, l);
-        
         boolean[] notSet = new boolean[numExamples];
-        
         Arrays.fill(notSet, true);
-        
         double[] F = new double[numExamples];
-             
         double eps = 1.0 - epsZero;
-        
         double[] alphaStat = new double[numExamples];
-        
         double[] scaler = new double[numExamples];
-        
         for (int i = 0; i < numExamples; i++) {
-            
             double s = 0;
-            
             for (int j = 0; j < numExamples; j++) {
-                
                 s += dwMatrix[i][j] * dwMatrix[i][j];
-            
             }
-            
             s = Math.sqrt(s + 0.0001);
-            
             s = 1.0;
-            
-            //System.out.print(uvec[i] + " ");
-            
             F[i] = -(c[i] / s);
-            
             uvec[i] *= s;
-            
             scaler[i] = s;
-            
             K[i][i] = 1.0;
-            
         }
-        
-        //System.out.println();
-        
-        
-        
+
 	    int indAlpha1 = 0;
 	    int indAlpha2 = 0;
-	    
 	    int steps = 0;
-	    
-	    //int maxAlphasNotChanged = 5;
-	    //int numAlphasNotChanged = 0;
-	    
 	    double rma1 = 0;
         double rma2 = 0;
         
         /* Find alphas */
-	    
 	    while (avUp > tolab) { // && numAlphasNotChanged < maxAlphasNotChanged) {
-	        
-	        //System.out.println("step: " + steps);
-	        
-	        // Choose index of sample for alpha 1
-	        
 	        maxUp = -1.0;
-	        
 	        for (int i = 0; i < numExamples; i++) {
-	            
 	            double fi = F[i];
-	            
 	            if (fi < 0 && alphas[i] < uvec[i] - epsZero) {
-	                
 	                fi = -fi;
-	                
 	                double fTest = uvec[i] - alphas[i];
-	                
 	                if (fi > fTest) fi = fTest;
-	                
 	                if (fi > maxUp) {
-	                    
 	                    maxUp = fi;
-	                    
 	                    indAlpha1 = i;
-	                    
 	                }
-	                
-	                
 	            } else {
-	             
 	                if (fi > 0 && alphas[i] > lvec[i] + epsZero) {
-	                    
 	                    double fTest = alphas[i] - lvec[i];
-	                    
 	                    if (fi > fTest) fi = fTest;
-	                    
 	                    if (fi > maxUp) {
-	                        
 	                        maxUp = fi;
-	                        
 	                        indAlpha1 = i;
-	                        
-	                    }	                    
-	                    
+	                    }
 	                }
-	                
 	            }
-	            
 	        }
-	        
+
 	        double f1 = F[indAlpha1];
-	        
 	        double a1 = alphas[indAlpha1];
-	        
-	        double l1 = lvec[indAlpha1]; 
-	        
+	        double l1 = lvec[indAlpha1];
 	        double u1 = uvec[indAlpha1];
 	        
 	        // Calculate kernel entry for indAlpha1
-	        
-	        if (notSet[indAlpha1]) {          
-	            
+	        if (notSet[indAlpha1]) {
 	            notSet[indAlpha1] = false;
-	            
 	            for (int i = 0; i < numExamples; i++) {
-	                
 	                if (notSet[i]) {
-	                    
 	                    double kij = 0;
-	                    
 	                    for (int j = 0; j < numExamples; j++) {
-	                        
 	                        kij += dwMatrix[indAlpha1][j] * dwMatrix[i][j];
-	                    
 	                    }
-	                    
-	                    //System.out.println("kij: " + kij);
-	                    	                    
 	                    kij /= scaler[indAlpha1] * scaler[i];
-	                    
 	                    K[indAlpha1][i] = kij;
-	                    
 	                    K[i][indAlpha1] = kij;
-	                    
 	                }
-	                
 	            }
-	            
 	        }
 	        
 	        // Now search for alpha_2 for alpha_1
@@ -261,17 +163,11 @@ public class SMO {
 	        maxUp = 0;
 	        
 	        for (int i = 0; i < numExamples; i++) {
-	            
 	            double k12 = K[indAlpha1][i]; // 0 <= k12 < 1
-	            
 	            if (k12 > eps) k12 = eps;
-	            
 	            double tmp = 1.0 - k12 * k12;
-	            
 	            double f2 = F[i];
-	            
 	            double optUnboundA1 = (f2 * k12 - f1) / tmp;
-	            
 	            double optUnboundA2 = (f1 * k12 - f2) / tmp;
 	            
 	            // check if updates are on bound

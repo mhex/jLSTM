@@ -63,30 +63,23 @@ public class LSTMSequence {
     public short[] getLocalCodings() {
         return localCodings;
     }
-    
     public float[][] getPositionCodings() {
         return positionCodings;
     }
-
     public int[][] getPositionIndices() {
         return positionIndices;
     }
-
     public float[] getTargets() {
         return targets;
     }
-    
     public boolean getToTrain() {
     	return toTrain;
     }
-    
     public void setToTrain(boolean flag) {
     	this.toTrain = flag;
     }
-    
     public LSTMSequence clone() {
     	return(new LSTMSequence(this.localCodings, this.positionCodings, this.positionIndices, this.targets));
     }
-        
 
 }

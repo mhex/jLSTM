@@ -50,118 +50,78 @@ public class JLSTMSCOP {
 
 	// Property file
 	static Properties properties;
-
 	// Data containers for the sequences
-
 	static ArrayList<LSTMSequence> seqsTrain;
 	static ArrayList<LSTMSequence> seqsTest;
-
 	/* for position coding */
     static int numPositionBins;
     static int numGaussians;
-
 	static int windowSize;
-
 	/* Number of symbols. 20 or 23 for Proteins and 4 for DNA. */
     static int nSymbols;
-
     /* Number of output units */
     static int numOutputUnits;
-
     /* Number of LSTM blocks */
     static int numBlocks;
-
     /* Index of last input unit */
     static int lastInputUnit;
-
     /* Bias unit */
     static int biasUnit;
-
     /* Number of inputs for local coding */
     static int numInputsLocalCoding;
-
     /* Index of last LSTM unit */
     static int lastLSTMUnit;
-
     /* Number of units */
     static int numUnits;
-
     /* Blocksize for every block */
     static int[] blockSize;
-
     /* Range for random init of weights */
     static float initRange;
-
-    /* Target values */
-    //static float targetpositive;
-    //static float targetnegative;
-
     /* Biases and initial weights */
     static float[] biasInputGate;
     static float[] biasOutputGate;
     static float[] biasMemInput;
     static float[] weightToOutput;
     static float biasOutput;
-
     /* GPU device */
     static int gpu;
-
     /* Batch size */
     static int batchSize;
-
     /* Learning rate */
     static float alpha;
-
     /* Upper alpha bound */
     static float upperAlpha;
-
     /* Error drop p */
     static float p;
-
     /* Cut dws above/below +/- dwCut */
     static float dwCut;
-
     /* Dropout rate to the output layer */
     static float dropoutRate;
-
     /* maximum number of epochs */
     static int maxepochs;
-
     /* After testnepochs a test is performed */
     static int testnepochs;
-
     /* After writeweightsafternepochs the weight matrix is written */
     static int writeweightsafternepochs;
-
     /* Write an additional better readable weight matrix? For debugging
      * and investigation.
      */
     static int humanreadableweightmatrix;
-
     /* Additional ROCN (e.g. N = 50) to be computed */
     static int rocn;
-
     /* Weight matrix */
     static WeightMatrix wm;
-
     static String weightfile;
-
     static String propertiesfile;
-
     /* test flag */
     static boolean test;
-
     static boolean loadweights;
-
     /* Input matrix */
     static InputMatrix im;
-
     /* LSTM core */
     static LSTM lstm;
-
     /* Number of threads */
     static int numThreads;
-
 	/**
 	 * Read and set properties from file
 	 *
@@ -184,37 +144,23 @@ public class JLSTMSCOP {
         numGaussians      = Integer.parseInt(properties.getProperty("numberofgaussians"));
 
         if (numPositionBins == 0 || numGaussians == 0) {
-
         	numPositionBins = 0;
         	numGaussians    = 0;
-
         }
 
         gpu           = Integer.parseInt(properties.getProperty("gpu"));
-
         alpha         = Float.parseFloat(properties.getProperty("learningrate"));
-
         batchSize     = Integer.parseInt(properties.getProperty("batchSize"));
-
         upperAlpha    = Float.parseFloat(properties.getProperty("upperAlpha"));
-
         p             = Float.parseFloat(properties.getProperty("p"));
-
         dwCut         = Float.parseFloat(properties.getProperty("dwCut"));
-
         dropoutRate   = Float.parseFloat(properties.getProperty("dropoutrate"));
-
         maxepochs     = Integer.parseInt(properties.getProperty("maxnumberofepochs"));
-
         testnepochs   = Integer.parseInt(properties.getProperty("performingtestafterNpochs"));
-
         writeweightsafternepochs  = Integer.parseInt(properties.getProperty("writeweightafterNepochs"));
         humanreadableweightmatrix = Integer.parseInt(properties.getProperty("humanreadableweightmatrix"));
-
         rocn          = Integer.parseInt(properties.getProperty("rocn"));
-
         biasOutput = Float.parseFloat(properties.getProperty("outputbias"));
-
         System.err.println("okay");
 
 	}
@@ -226,27 +172,17 @@ public class JLSTMSCOP {
 	static void readData() {
 
 		String fastaFilename  = properties.getProperty("inputdataTraining");
-
 		String labelsFilename = properties.getProperty("labelsTraining");
-
 	    System.err.println();
 	    System.err.print("reading data.. ");
-
 	    ReadFasta rf = new ReadFasta(nSymbols, numPositionBins, numGaussians);
-
 	    // Train
 	    seqsTrain = rf.read(fastaFilename, labelsFilename, numOutputUnits);
-
-
         fastaFilename  = properties.getProperty("inputdataTest");
-
         labelsFilename = properties.getProperty("labelsTest");
-
 	    // Test
         seqsTest = rf.read(fastaFilename, labelsFilename, numOutputUnits);
-
         System.err.println("okay");
-
         System.err.println();
         System.err.println("Train        :" + " " + seqsTrain.size());
         System.err.println("Test         :" + " " + seqsTest.size());
@@ -261,18 +197,12 @@ public class JLSTMSCOP {
 
 	    System.err.println();
 	    System.err.print("reading data for testing.. ");
-
         String fastaFilename  = properties.getProperty("inputdataTest");
-
         String labelsFilename = properties.getProperty("labelsTest");
-
         ReadFasta rf = new ReadFasta(nSymbols, numPositionBins, numGaussians);
-
 	    // Test
         seqsTest = rf.read(fastaFilename, labelsFilename, numOutputUnits);
-
         System.err.println("okay");
-
         System.err.println();
         System.err.println("Test             :" + " " + seqsTest.size());
 
@@ -286,44 +216,30 @@ public class JLSTMSCOP {
 
 		// Blocksizes
         blockSize = new int[numBlocks];
-
         for (int i = 0; i < numBlocks; i++) {
             blockSize[i] = 1;
         }
-
-
         // Input bias
         biasMemInput = new float[numBlocks];
-
         Random r = new Random();
-
         float rangeMin = windowSize / 10.0f;
         float rangeMax = windowSize / 1.0f;
-
         // Random bias to the memory units
         for (int i = 0; i < numBlocks; i++) {
             biasMemInput[i] =  - (rangeMin + (rangeMax - rangeMin) * r.nextFloat());
         }
-
         // Inputgate biases
         biasInputGate = new float[numBlocks];
-
-
         for (int i = 0; i < numBlocks; i++) {
             biasInputGate[i] = -1;
         }
-
         // Outputgate biases
         biasOutputGate = new float[numBlocks];
-
-
         for (int i = 0; i < numBlocks; i++) {
             biasOutputGate[i] = -1;
         }
-
         // Output weights alternating
         weightToOutput = new float[numBlocks];
-
         for (int i = 0; i < numBlocks; i++) {
         	if (i % 2 == 0) {
         		weightToOutput[i] = 0.1f;
@@ -331,7 +247,6 @@ public class JLSTMSCOP {
         		weightToOutput[i] = 0.1f;
         	}
         }
-
 	}
 
 	/**
@@ -342,23 +257,16 @@ public class JLSTMSCOP {
 
         /* Number of inputs */
         lastInputUnit = nSymbols * windowSize - 1 + numPositionBins;
-
         /* Bias unit */
         biasUnit = lastInputUnit + 1;
-
         /* Number of inputs for local coding */
         numInputsLocalCoding = windowSize;
-
         lastLSTMUnit = biasUnit;
-
         for (int i = 0; i < numBlocks; i++) {
-
           lastLSTMUnit += (2 + blockSize[i]);
-
         }
 
         numUnits = lastLSTMUnit + numOutputUnits + 1;
-
         System.err.println();
         int numInputs = lastInputUnit + 1;
         System.err.println("Number of Blocks  : " + numBlocks);
@@ -393,10 +301,8 @@ public class JLSTMSCOP {
         		System.err.println("Additional human readable weight matrix : yes");
         	}
         	System.err.println("Writing weight matrix every              : " + writeweightsafternepochs + " epochs");
-
         	System.err.println();
         	System.err.println("Number of Threads                        : " + numThreads);
-
         }
 
         // Create weightmatrix
@@ -406,8 +312,6 @@ public class JLSTMSCOP {
                 blockSize, nSymbols, initRange, alpha);
 
         wm.setWeightfile(weightfile);
-
-
 
 	}
 
@@ -421,19 +325,15 @@ public class JLSTMSCOP {
 	    if (args.length < 6 || args.length > 7) {
 	        usage();
 	    }
-
 	    if (!"-p".equals(args[0])) {
 	    	usage();
 	    }
-
 	    else {
 	    	propertiesfile = args[1];
 	    }
-
 	    if (!"-w".equals(args[2])) {
 	    	usage();
 	    }
-
 	    else {
 	    	weightfile = args[3];
 	    }
@@ -441,37 +341,24 @@ public class JLSTMSCOP {
 	    if (!"-t".equals(args[4])) {
 	    	usage();
 	    }
-
 	    else {
-	    	numThreads = Integer.valueOf(args[5]);
+	    	numThreads = Integer.parseInt(args[5]);
 	    }
-
 
 	    test        = false;
 	    loadweights = false;
 
 	    if (args.length == 7) {
-
         	if ("-test".equals(args[6])) {
-
         		test = true;
-
         	}
-
         	else if ("-lw".equals(args[6])) {
-
         		loadweights = true;
-
         	}
-
         	else {
-
         		usage();
-
         	}
-
 	    }
-
 	}
 
 
@@ -491,11 +378,8 @@ public class JLSTMSCOP {
 	public static void main(String[] args) {
 
 	    parseCommandline(args);
-
 	    readProperties();
-
 	    initNetParams();
-
 	    if (test) {
 	    	readDataTest();
 	    }
@@ -506,19 +390,12 @@ public class JLSTMSCOP {
         init();
 
         /* if -lw or -test parameter set then load weights */
-
         if (test || loadweights) {
-
         	System.err.println();
-
         	System.err.print("Reading weight matrix.. ");
-
         	wm.readWeightMatrix();
-
         	System.err.println("okay");
-
         	System.err.println();
-
         }
 
         /* test with one thread */
@@ -545,16 +422,13 @@ public class JLSTMSCOP {
 
         	/* test and exit */
         	lt.start();
-
         	try {
         		lt.join();
         	}
         	catch (InterruptedException ie) {
         		System.err.println("Something went wrong joining threads. Should not happen with one test thread.");
         	}
-
         	System.exit(0);
-
 	    }
 
         System.err.println();
@@ -566,7 +440,6 @@ public class JLSTMSCOP {
         ArrayList<Thread> threadList = new ArrayList<Thread>();
 
         for (int thread = 0; thread < numThreads; thread++) {
-
         	LSTMThread lt = new LSTMThread(numUnits, lastInputUnit, biasUnit, lastLSTMUnit, numInputsLocalCoding,
         			numBlocks, blockSize, nSymbols,
         			gpu,
@@ -584,11 +457,8 @@ public class JLSTMSCOP {
         			seqsTest,
         			wm, false,
         			numThreads, thread + 1);
-
         	lt.start();
-
         	threadList.add(lt);
-
 
         	/* Wait a little bit for the next thread */
             /*
@@ -599,19 +469,16 @@ public class JLSTMSCOP {
         		// nothing
         	}
             */
-
         }
 
         /* Wait until all threads have finished */
         for (int i = 0; i < threadList.size(); i++) {
-
         	try {
         		threadList.get(i).join();
         	}
         	catch (InterruptedException ie) {
         		System.err.println("Something went wrong joining threads");
         	}
-
         }
 
         /* Start a last test */
@@ -632,7 +499,6 @@ public class JLSTMSCOP {
     			seqsTest,
     			wm, true,
     			numThreads, 1).start();
-
 	}
 
 }

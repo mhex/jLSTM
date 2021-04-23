@@ -59,9 +59,7 @@ public class ReadFasta {
 
 	int numPositionBins;
 	int numGaussians;
-
     ArrayList<GaussStruct> positionVector;
-
     float[][] positionCodings;
     int[][] positionIndices;
 
@@ -69,16 +67,13 @@ public class ReadFasta {
 
 		this.numPositionBins = numposbins;
 		this.numGaussians   = numgauss;
-
 		this.positionVector = new ArrayList<GaussStruct>(numposbins);
 
 		for (int i = 0; i < numposbins; i++) {
-
 			GaussStruct gs = new GaussStruct();
 			gs.gauss = 0;
 			gs.idx   = 0;
 			positionVector.add(gs);
-
 		}
 
     }
@@ -93,9 +88,7 @@ public class ReadFasta {
     	int idx;
 
     	public int compareTo(Object obj) {
-
     	    GaussStruct gs = (GaussStruct) obj;
-
     	    if ( gauss == gs.gauss ) {
     			return 0;
     		}
@@ -103,7 +96,6 @@ public class ReadFasta {
     			return -1;
     		}
     		else return 1;
-
     	}
 
     }
@@ -111,15 +103,11 @@ public class ReadFasta {
     public class GaussStructComparator implements Comparator<Object> {
 
     	public int compare(Object obj1, Object obj2) {
-
     		GaussStruct gs1 = (GaussStruct) obj1;
     	    GaussStruct gs2 = (GaussStruct) obj2;
-
     	    int gsComp = gs1.compareTo(gs2);
-
     	    return ((gsComp == 0) ? gs1.compareTo(gs2) : gsComp);
-
-    	  }
+    	}
 
     }
 
@@ -134,9 +122,7 @@ public class ReadFasta {
     	positionIndices = new int[rs.length()][numGaussians];
 
     	if (numPositionBins > 0) {
-
     		float sd = (float)rs.length() / (numPositionBins - 1.0f);
-
     		for (int i = 0; i < rs.length(); i++) {
     			for (int j = 0; j < numPositionBins; j++) {
     				this.positionVector.get(j).gauss = lstmgauss((float)j * sd, sd, (float)i);
@@ -146,17 +132,13 @@ public class ReadFasta {
     			positionCodings[i][numGaussians / 2] = positionVector.get(0).gauss;
     			positionIndices[i][numGaussians / 2] = positionVector.get(0).idx;
     			for (int j = 1, k = 1; j < numGaussians / 2 + 1; j++, k += 2) {
-    				//System.out.println(j + " " + k + " " + numGaussians / 2);
     				positionCodings[i][numGaussians / 2 - j] = positionVector.get(k).gauss;
     				positionIndices[i][numGaussians / 2 - j] = positionVector.get(k).idx;
     				positionCodings[i][numGaussians / 2 + j] = positionVector.get(k + 1).gauss;
     				positionIndices[i][numGaussians / 2 + j] = positionVector.get(k + 1).idx;
-    				//System.out.printf("%d %f %d %f %d %f %d\n", i, positionCodings[i][numGaussians / 2 - j], positionIndices[i][numGaussians / 2 - j], positionCodings[i][numGaussians / 2],  positionIndices[i][numGaussians / 2], positionCodings[i][numGaussians / 2 + j], positionIndices[i][numGaussians / 2 + j]);
     			}
     		}
-
     	}
-
     }
 
 
@@ -174,7 +156,6 @@ public class ReadFasta {
         final char aaChars[] =
             {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M',
              'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'Z', 'X'};
-
 
         int i;
         for (i = 0; i < 23; i++) {
@@ -219,7 +200,7 @@ public class ReadFasta {
 
     	ArrayList<Integer> labels = new ArrayList<Integer>();
     	while (s.hasNext()){
-    		int label = Integer.valueOf(s.next());
+    		int label = Integer.parseInt(s.next());
     		if (label < 1) {
     			System.err.println("found a label 0 or negative.");
     			System.exit(1);
@@ -235,15 +216,10 @@ public class ReadFasta {
     	float[][] targets = new float[labels.size()][numOutputs];
 
     	for (int i = 0; i < labels.size(); i++) {
-
     		for (int j = 0; j < numOutputs; j++) {
-
     			targets[i][j] = 0.0f;
-
     		}
-
     		targets[i][labels.get(i) - 1] = 1.0f;
-
     	}
 
         ArrayList<LSTMSequence> seqs = new ArrayList<LSTMSequence>();
@@ -252,48 +228,30 @@ public class ReadFasta {
             // Setup file input
             BufferedReader br =
                 new BufferedReader(new FileReader(fastaFilename));
-
             // RichSequenceIterator
             RichSequenceIterator rsi = IOTools.readFastaProtein(br, null);
-
             int i = 0;
-
             // For each sequence do
             while(rsi.hasNext()) {
-
             	if (i + 1 > labels.size()) {
-
             		System.err.println("Error: Number of sequences " + (i + 1) + " is greater than number of labels " + labels.size() +".");
-
             		System.exit(1);
-
             	}
-
                 try {
-
                     RichSequence rs = rsi.nextRichSequence();
-
-                    //System.out.println(rs.getName() + " " + rs.getDescription());
-
                     // Sequence data
                     char seq[] = new char[rs.length()];
                     short localCodings[] = new short[rs.length()];
-
                     rs.seqString().getChars(0, rs.length(), seq, 0);
-
                     // Compute local coding indices
                     for (int j = 0; j < rs.length(); j++) {
                         localCodings[j] = getAACharPos(seq[j]);
                     }
-
                     computePositionCodings(rs);
-
                     // Store codings and label in a LSTMSequence
                     LSTMSequence lstmseq = new LSTMSequence(localCodings, positionCodings.clone(), positionIndices.clone(), targets[i]);
-
                     // Add LSTMSequence to ArrayList
                     seqs.add(lstmseq);
-
                 }
                 catch (BioException ex) {
                     //not in fasta format or wrong alphabet
@@ -305,29 +263,21 @@ public class ReadFasta {
                     System.out.println("no fasta sequences in the file");
                     System.exit(0);
                 }
-
                 i++;
-
             }
 
             br.close();
 
             if (i  != labels.size()) {
-
         		System.err.println("Error: Number of labels is greater than the number of sequences.");
-
         		System.exit(1);
-
         	}
-
-
         }
         catch (FileNotFoundException fnfex) {
             //problem reading file
             System.err.println("jLSTM: Could not open sequence file: " + fastaFilename);
             System.exit(1);
         }
-
         catch (IOException ioe) {
         	  //problem reading file
             System.err.println("jLSTM: Could not close sequence file: " + fastaFilename);
